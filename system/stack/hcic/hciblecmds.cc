@@ -23,6 +23,8 @@
  *
  ******************************************************************************/
 
+#define LOG_TAG "bt_hciblecmds"
+
 #include <base/functional/bind.h>
 #include <bluetooth/log.h>
 #include <stddef.h>
@@ -241,8 +243,7 @@ void btsnd_hcic_ble_rand(base::Callback<void(BT_OCTET8)> cb) {
           FROM_HERE, HCI_BLE_RAND, nullptr, 0,
           base::Bind(
                   [](base::Callback<void(BT_OCTET8)> cb, uint8_t* param, uint16_t /* param_len */) {
-                    bluetooth::log::assert_that(param[0] == 0,
-                                                "LE Rand return status must be zero");
+                  bluetooth::log::warn("LE Rand return status is not zero: {}", param[0]);
                     cb.Run(param + 1 /* skip status */);
                   },
                   std::move(cb)));

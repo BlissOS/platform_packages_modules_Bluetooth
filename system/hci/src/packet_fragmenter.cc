@@ -404,8 +404,6 @@ static void reassemble_and_dispatch(BT_HDR* packet) {
     STREAM_TO_UINT16(handle, stream);
     STREAM_TO_UINT16(acl_length, stream);
 
-    CHECK(acl_length == packet->len - HCI_ACL_PREAMBLE_SIZE);
-
     uint8_t boundary_flag = GET_BOUNDARY_FLAG(handle);
     uint8_t broadcast_flag = GET_BROADCAST_FLAG(handle);
     handle = handle & HANDLE_MASK;

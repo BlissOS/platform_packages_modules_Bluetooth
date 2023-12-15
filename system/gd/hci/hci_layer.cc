@@ -85,7 +85,7 @@ static void fail_if_reset_complete_not_success(CommandCompleteView complete) {
 }
 
 static void abort_after_time_out(OpCode op_code) {
-  log::fatal("Done waiting for debug information after HCI timeout ({}) for {}ms",
+  log::warn("Done waiting for debug information after HCI timeout ({}) for {}ms",
              OpCodeText(op_code), getHciTimeoutRestartMs().count());
 }
 

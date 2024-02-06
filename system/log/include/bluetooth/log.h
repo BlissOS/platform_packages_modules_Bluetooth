@@ -213,6 +213,20 @@ struct assert_that {
 template <typename... T>
 assert_that(bool, fmt::format_string<T...>, T&&...) -> assert_that<T...>;
 
+template <typename... T>
+struct assert_warn_that {
+  assert_warn_that(bool cond, fmt::format_string<T...> fmt, T&&... args,
+              log_internal::source_location location = log_internal::source_location()) {
+    if (!cond) {
+      vlog(log_internal::kWarn, LOG_TAG, location, static_cast<fmt::string_view>(fmt),
+           fmt::make_format_args(log_internal::format_replace(args)...));
+    }
+  }
+};
+
+template <typename... T>
+assert_warn_that(bool, fmt::format_string<T...>, T&&...) -> assert_warn_that<T...>;
+
 }  // namespace bluetooth::log
 
 namespace fmt {

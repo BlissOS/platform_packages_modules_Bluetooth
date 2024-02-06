@@ -197,6 +197,13 @@ static_assert(LOG_TAG != nullptr, "LOG_TAG is null after header inclusion");
     }                                                        \
   } while (false)
 
+#define ASSERT_WARN(condition)                               \
+  do {                                                       \
+    if (!(condition)) {                                      \
+      LOG_WARN("assertion '" #condition "' failed");         \
+    }                                                        \
+  } while (false)
+
 #define ASSERT_LOG(condition, fmt, args...)                                 \
   do {                                                                      \
     if (!(condition)) {                                                     \

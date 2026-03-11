@@ -56,6 +56,10 @@ constexpr bool kDefaultErroneousDataReportingEnabled = true;
 static const std::string kPropertyErroneousDataReportingEnabled =
     "bluetooth.hci.erroneous_data_reporting.enabled";
 
+constexpr bool kDefaultBluetoothLEDisabled = false;
+static const std::string kPropertyBluetoothLEDisabled =
+    "bluetooth.core.le.disabled";
+
 using os::Handler;
 
 struct Controller::impl {
@@ -72,7 +76,9 @@ struct Controller::impl {
       set_event_mask_page_2(kDefaultEventMaskPage2);
     }
 
+    if (!os::GetSystemPropertyBool(kPropertyBluetoothLEDisabled, kDefaultBluetoothLEDisabled)) {
     write_le_host_support(Enable::ENABLED, Enable::DISABLED);
+    }
     hci_->EnqueueCommand(
             ReadLocalNameBuilder::Create(),
             handler->BindOnceOn(this, &Controller::impl::read_local_name_complete_handler));
@@ -85,6 +91,7 @@ struct Controller::impl {
             handler->BindOnceOn(this,
                                 &Controller::impl::read_local_supported_commands_complete_handler));
 
+    if (!os::GetSystemPropertyBool(kPropertyBluetoothLEDisabled, kDefaultBluetoothLEDisabled)) {
     hci_->EnqueueCommand(
             LeReadLocalSupportedFeaturesBuilder::Create(),
             handler->BindOnceOn(this, &Controller::impl::le_read_local_supported_features_handler));
@@ -92,6 +99,10 @@ struct Controller::impl {
     hci_->EnqueueCommand(
             LeReadSupportedStatesBuilder::Create(),
             handler->BindOnceOn(this, &Controller::impl::le_read_supported_states_handler));
+    } else {
+    le_local_supported_features_ = 0x00;
+    le_supported_states_ = 0x0;
+    }
 
     // Wait for all extended features read
     std::promise<void> features_promise;
@@ -128,6 +139,7 @@ struct Controller::impl {
               handler->BindOnceOn(this, &Controller::impl::set_min_encryption_key_size_handler));
     }
 
+    if (!os::GetSystemPropertyBool(kPropertyBluetoothLEDisabled, kDefaultBluetoothLEDisabled)) {
     if (is_supported(OpCode::LE_READ_BUFFER_SIZE_V2)) {
       hci_->EnqueueCommand(
               LeReadBufferSizeV2Builder::Create(),
@@ -156,7 +168,14 @@ struct Controller::impl {
       log::info("LE_READ_RESOLVING_LIST_SIZE not supported, defaulting to 0");
       le_resolving_list_size_ = 0;
     }
+    } else {
+    le_buffer_size_.total_num_le_packets_ = acl_buffers_ / 2;
+    acl_buffers_ -= le_buffer_size_.total_num_le_packets_;
+    le_buffer_size_.le_data_packet_length_ = acl_buffer_length_;
+    le_resolving_list_size_ = 0;
+    }
 
+    if (!os::GetSystemPropertyBool(kPropertyBluetoothLEDisabled, kDefaultBluetoothLEDisabled)) {
     if (is_supported(OpCode::LE_READ_MAXIMUM_DATA_LENGTH) &&
         module_.SupportsBleDataPacketLengthExtension()) {
       hci_->EnqueueCommand(
@@ -169,6 +188,12 @@ struct Controller::impl {
       le_maximum_data_length_.supported_max_tx_octets_ = 0;
       le_maximum_data_length_.supported_max_tx_time_ = 0;
     }
+    } else {
+    le_maximum_data_length_.supported_max_rx_octets_ = 0;
+    le_maximum_data_length_.supported_max_rx_time_ = 0;
+    le_maximum_data_length_.supported_max_tx_octets_ = 0;
+    le_maximum_data_length_.supported_max_tx_time_ = 0;
+    }
 
     // SSP is managed by security layer once enabled
     write_simple_pairing_mode(Enable::ENABLED);
@@ -179,6 +204,7 @@ struct Controller::impl {
                       this,
                       &Controller::impl::write_secure_connections_host_support_complete_handler));
     }
+    if (!os::GetSystemPropertyBool(kPropertyBluetoothLEDisabled, kDefaultBluetoothLEDisabled)) {
     if (is_supported(OpCode::LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH) &&
         module_.SupportsBleDataPacketLengthExtension()) {
       hci_->EnqueueCommand(
@@ -245,6 +271,12 @@ struct Controller::impl {
                                               Enable::ENABLED),
               handler->BindOnceOn(this, &Controller::impl::le_set_host_feature_handler));
     }
+    } else {
+    le_suggested_default_data_length_ = 0;
+    le_maximum_advertising_data_length_ = 0;
+    le_number_supported_advertising_sets_ = 0;
+    le_periodic_advertiser_list_size_ = 0;
+    }
 
     if (os::GetSystemPropertyBool(
             kPropertyErroneousDataReportingEnabled, kDefaultErroneousDataReportingEnabled)) {
@@ -256,6 +288,7 @@ struct Controller::impl {
         }
     }
 
+    if (!os::GetSystemPropertyBool(kPropertyBluetoothLEDisabled, kDefaultBluetoothLEDisabled)) {
     // Skip vendor capabilities check if configured.
     if (os::GetSystemPropertyBool(kPropertyVendorCapabilitiesEnabled,
                                   kDefaultVendorCapabilitiesEnabled)) {
@@ -269,6 +302,7 @@ struct Controller::impl {
       vendor_future.wait();
     } else {
       vendor_capabilities_.is_supported_ = 0x00;
+    }
     }
 
     // We only need to synchronize the last read. Make BD_ADDR to be the last one.
@@ -835,10 +869,11 @@ struct Controller::impl {
   }
 
   void le_rand_cb(LeRandCallback cb, CommandCompleteView view) {
-    ASSERT(view.IsValid());
+    log::assert_warn_that(view.IsValid(), "assert failed: le_rand_cb: view.IsValid()");
     auto status_view = LeRandCompleteView::Create(view);
-    ASSERT(status_view.IsValid());
-    ASSERT(status_view.GetStatus() == ErrorCode::SUCCESS);
+    log::assert_warn_that(status_view.IsValid(), "assert failed: le_rand_cb: status_view.IsValid()");
+    log::assert_warn_that(status_view.GetStatus() == ErrorCode::SUCCESS,
+     "assert failed: le_rand_cb: status_view.GetStatus() == ErrorCode::SUCCESS");
     std::move(cb)(status_view.GetRandomNumber());
   }
 
